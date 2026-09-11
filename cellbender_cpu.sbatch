@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=cellbender-cpu
 #SBATCH --partition=day
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=96G
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=32G
 #SBATCH --time=1-00:00:00
 #SBATCH --output=cellbender_cpu_%j.out
 
