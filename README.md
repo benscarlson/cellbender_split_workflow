@@ -29,7 +29,7 @@ The workflow has batch scripts for the gpu and cpu jobs, plus some bash and slur
 This walks through the small demo dataset from the
 [CellBender tutorial](https://cellbender.readthedocs.io/en/latest/tutorial/),
 split across two jobs. It assumes you already have a working CellBender conda
-environment. The whole thing takes a couple of minutes.
+environment called `cellbender`.
 
 ### 1. Get the scripts
 
@@ -42,24 +42,22 @@ git clone https://github.com/ycrc/cellbender_split_workflow.git
 ### 2. Make the demo dataset
 
 CellBender ships a script that downloads the 10x `heart10k` dataset and trims it
-down to something small. Run it from the `examples/remove_background/` folder of
-your CellBender checkout:
+down to something small. Run the script from the `cellbender_demo` directory so that the results will be saved there.
 
 ```bash
+salloc
 ml reset
 ml miniconda
-conda activate cellbender-main
+conda activate cellbender
 
-cd /path/to/CellBender/examples/remove_background
-python generate_tiny_10x_dataset.py
+python /path/to/CellBender/examples/remove_background/generate_tiny_10x_dataset.py
 ```
 
-It downloads about 170 MB and writes `tiny_raw_feature_bc_matrix.h5ad`. Copy
-that into the demo folder and make somewhere for the results:
+It downloads about 170 MB and writes `tiny_raw_feature_bc_matrix.h5ad`.
+
+Now, create a directory for the results:
 
 ```bash
-cd ~/palmer_scratch/cellbender_demo
-cp /path/to/CellBender/examples/remove_background/tiny_raw_feature_bc_matrix.h5ad .
 mkdir results
 ```
 
@@ -68,6 +66,7 @@ You should now have:
 ```
 ~/palmer_scratch/cellbender_demo/
     tiny_raw_feature_bc_matrix.h5ad
+    heart10k_raw_feature_bc_matrix.h5
     results/
     cellbender_split_workflow/      <- the scripts you cloned
 ```
@@ -94,7 +93,7 @@ CKPT=$HOME/palmer_scratch/cellbender_demo/results/tiny_ckpt.tar.gz
 
 ml reset
 ml miniconda
-conda activate cellbender-main
+conda activate cellbender
 
 # This demo dataset is so small that the watcher needs to look more often than
 # usual to catch the handover. Leave this out on real data.
@@ -133,7 +132,7 @@ CKPT_CPU=$HOME/palmer_scratch/cellbender_demo/results/tiny_ckpt_cpu.tar.gz
 
 ml reset
 ml miniconda
-conda activate cellbender-main
+conda activate cellbender
 
 source "${SLURM_SUBMIT_DIR:-.}/cellbender_functions.sh" || exit 1
 
