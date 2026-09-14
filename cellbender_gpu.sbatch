@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=16G
-#SBATCH --time=1-00:00:00
+#SBATCH --time=2:00:00
 #SBATCH --output=cellbender_gpu_%j.out
 
 # Stage 1 of 2: run CellBender's inference step on a GPU.
@@ -20,7 +20,7 @@ CKPT=/path/to/results/sample1_ckpt.tar.gz
 
 ml reset
 ml miniconda
-conda activate cellbender-main
+conda activate cellbender
 
 # Extra helper commands for this workflow. If you move this script somewhere
 # else, put the full path to cellbender_functions.sh here.
