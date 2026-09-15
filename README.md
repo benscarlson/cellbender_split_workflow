@@ -10,8 +10,7 @@ This section provides a summay of the workflow. See below for a full example.
 
 The workflow has batch scripts for the gpu and cpu jobs, plus some bash and slurm functionality to run the workflow. A bash function watches the gpu job and cancels it once inference is complete. Slurm automatically starts the cpu job after the gpu job is complete. Running the workflow can be accomplished in three easy steps.
 
-You work in your own directory — whatever folder holds your data. The workflow
-directory you cloned is never edited or written to.
+You work in your own directory — whatever folder holds your data.
 
 1. **Copy the job scripts into your working directory.** From the folder with
    your data in it:
@@ -65,9 +64,14 @@ environment called `cellbender`.
 ### 1. Get the scripts
 
 ```bash
+cd ~/palmer_scratch
+
+#Clone the repo with the split workflow
+git clone https://github.com/ycrc/cellbender_split_workflow.git
+
+#Make a working directory
 mkdir -p ~/palmer_scratch/cellbender_demo
 cd ~/palmer_scratch/cellbender_demo
-git clone https://github.com/ycrc/cellbender_split_workflow.git
 ```
 
 ### 2. Make the demo dataset
@@ -86,11 +90,12 @@ python /path/to/CellBender/examples/remove_background/generate_tiny_10x_dataset.
 
 It downloads about 170 MB and writes `tiny_raw_feature_bc_matrix.h5ad`.
 
-### 3. Copy in the job scripts
+### 3. Initialize the workflow
+
+This copies in the job script templates, submit script, and creates a folder for results.
 
 ```bash
-cd ~/palmer_scratch/cellbender_demo
-./cellbender_split_workflow/submit.sh --init
+~/palmer_scratch/cellbender_split_workflow/submit.sh --init
 ```
 
 You should now have:
@@ -99,16 +104,14 @@ You should now have:
 ~/palmer_scratch/cellbender_demo/
     tiny_raw_feature_bc_matrix.h5ad
     heart10k_raw_feature_bc_matrix.h5
-    cellbender_gpu.sbatch           <- copied in, yours to edit
-    cellbender_cpu.sbatch           <- copied in, yours to edit
+    cellbender_gpu.sbatch           <- edit this
+    cellbender_cpu.sbatch           <- edit this
     results/
-    cellbender_split_workflow/      <- the scripts you cloned, leave alone
 ```
 
 ### 4. Check the job scripts
 
-The scripts come set up for exactly this demo, so there is nothing to change
-unless your conda environment is named something other than `cellbender`.
+With your own data, you would edit cellbender_gpu.sbatch and cellbender_cpu.sbatch. For this demo, the scripts come set up to work out of the box, so there is nothing to change unless your conda environment is named something other than `cellbender`.
 
 `cellbender_gpu.sbatch`:
 
@@ -143,13 +146,15 @@ cellbender remove-background \
     --total-droplets-included 2000
 ```
 
-`cellbender_cpu.sbatch` — the same paths and CellBender options, plus
+`cellbender_cpu.sbatch` 
+
+This script contains the same paths and CellBender options, plus
 `CKPT_CPU`. No GPU, so no `--gres` line and no `--cuda`:
 
 ```bash
 #!/bin/bash
 #SBATCH --job-name=cellbender-cpu
-#SBATCH --partition=devel
+#SBATCH --partition=day
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=5G
 #SBATCH --time=00:30:00
