@@ -3,8 +3,35 @@
 Companion to `README.md`, which covers day-to-day use. This file covers how the
 handover works, why the CPU stage needs the options it has, and what was tested.
 
-Written against CellBender `0.3.2.post8+git.c5f5d9f4`. Line references are to
-that revision.
+Written against CellBender at `v0.4.0-1-gf36ae29` (one commit past the v0.4.0
+tag). Line references are to that revision.
+
+## Requires CellBender 0.4.0 or newer
+
+`save_checkpoint` in 0.3.2 and earlier calls `torch.save(model_obj, ...)` with
+the standard pickler, which cannot serialise the model:
+
+```
+TypeError: cannot pickle 'weakref' object
+```
+
+`save_checkpoint` catches it (`except Exception`), logs `Could not save
+checkpoint`, and returns `False` — so the run carries on and prints `Inference
+procedure complete.` with no checkpoint on disk. Passing `pickle_module=dill`
+fixes it, and that change arrived in commit `79ebe1a1` ("Update to Python 3.9 and
+PyTorch 2", #420), which is in v0.4.0 but not in the v0.3.2 tag.
+
+This workflow cannot work without the checkpoint, so 0.4.0 is a hard floor.
+
+What that failure looks like if it happens anyway: the watcher requires both the
+log marker *and* the checkpoint file, so it correctly declines to hand over. The
+GPU job then dies on CellBender's own assertion at the top of
+`load_or_compute_posterior_and_save` (which checks the tarball exists before
+doing any work, so no GPU time is wasted on the posterior), and the CPU job fails
+within seconds in `make_checkpoint_cpu_ready`. Both jobs end `FAILED` rather than
+`CANCELLED`/`COMPLETED`. `start_watcher` also greps for `Could not save
+checkpoint` and prints an explanation, since the traceback is otherwise buried
+mid-log.
 
 ## Files
 

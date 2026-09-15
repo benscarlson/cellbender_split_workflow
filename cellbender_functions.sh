@@ -48,6 +48,17 @@ start_watcher() {
                 exit 0
             fi
 
+            # No checkpoint means there is nothing for the CPU job to pick up, so
+            # say so plainly now rather than leaving a traceback buried in the log.
+            if grep -qF 'Could not save checkpoint' "$log"; then
+                echo "watcher: ERROR -- CellBender could not save a checkpoint."
+                echo "watcher: this workflow has nothing to hand over without one."
+                echo "watcher: the usual cause is a CellBender older than 0.4.0, where"
+                echo "watcher: saving a checkpoint fails with \"cannot pickle 'weakref' object\"."
+                echo "watcher: check your environment with:  cellbender --version"
+                exit 1
+            fi
+
             # Inference is done once this line appears. CellBender saves the
             # final checkpoint just before printing it, so wait for the tarball
             # as well. The .tmp check means we never look at a half-written one.

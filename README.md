@@ -6,7 +6,7 @@ This workflow splits the Cellbender analysis in two. The first job performs infe
 
 ## Overview of the workflow
 
-This section provides a summay of the workflow. See below for a full example.
+This section provides a summay of the workflow. See below for a full example. Also see the section to first verify the cellbender version.
 
 The workflow has batch scripts for the gpu and cpu jobs, plus some bash and slurm functionality to run the workflow. A bash function watches the gpu job and cancels it once inference is complete. Slurm automatically starts the cpu job after the gpu job is complete. Running the workflow can be accomplished in three easy steps.
 
@@ -61,7 +61,7 @@ This walks through the small demo dataset from the
 split across two jobs. It assumes you already have a working CellBender conda
 environment called `cellbender`.
 
-### 1. Get the scripts
+### 1. Get the workflow
 
 ```bash
 cd ~/palmer_scratch
@@ -74,16 +74,41 @@ mkdir -p ~/palmer_scratch/cellbender_demo
 cd ~/palmer_scratch/cellbender_demo
 ```
 
+## 1a. check your CellBender
+
+The whole workflow is built on CellBender's checkpoint file. In releases before
+0.4.0, saving a checkpoint fails outright with `cannot pickle 'weakref' object`,
+so there is nothing for the second job to pick up. Check your environment once,
+before anything else:
+
+```bash
+ml reset
+ml miniconda
+conda activate cellbender
+
+/path/to/cellbender_split_workflow/submit.sh --check
+```
+
+```
+cellbender 0.4.0
+  from /path/to/cellbender/remove_background/checkpoint.py
+  checkpointing: OK
+```
+
+If it says `BROKEN`, you need a newer CellBender. Note that `cellbender
+--version` on its own is not a reliable check — a development install can report
+an old version string even when the code is current, which is why this looks at
+the code instead.
+
+(The same bug means `--checkpoint-mins` does nothing on those versions, so an
+ordinary single-job CellBender run there has no crash protection either.)
+
 ### 2. Make the demo dataset
 
 CellBender ships a script that downloads the 10x `heart10k` dataset and trims it
 down to something small. Run the script from the `cellbender_demo` directory so that the results will be saved there.
 
 ```bash
-salloc
-ml reset
-ml miniconda
-conda activate cellbender
 
 python /path/to/CellBender/examples/remove_background/generate_tiny_10x_dataset.py
 ```
@@ -227,6 +252,9 @@ on the counts removed, with the same cells called. This is normal and is
 explained in `technical_doc.md`.
 
 ## If something goes wrong
+
+**Both jobs failed, and the log says `Could not save checkpoint`.** Your
+CellBender is older than 0.4.0. See the top of this page.
 
 **The GPU job ran out of time.** Nothing is lost — CellBender saves its progress
 every few minutes. Run `submit.sh` again and it carries on from where it got to.

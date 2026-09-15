@@ -1,13 +1,5 @@
 #!/bin/bash
 # Submit the two CellBender jobs.
-#
-#   submit.sh --init       copy the job scripts into the current directory
-#   submit.sh              submit both jobs
-#   submit.sh --cpu-only   submit just the CPU job (to retry stage 2)
-#
-# Run this from your own working directory -- wherever your data is and where
-# you want the results. It can be called by its full path from anywhere, and it
-# never writes anything into the workflow directory itself.
 
 set -euo pipefail
 
@@ -16,17 +8,64 @@ GPU_SCRIPT=cellbender_gpu.sbatch
 CPU_SCRIPT=cellbender_cpu.sbatch
 
 usage() {
-    sed -n '2,10p' "$(readlink -f "$0")" | sed 's/^# \?//'
+    cat <<'EOF'
+Submit the two CellBender jobs.
+
+  submit.sh --check      check that your CellBender can save checkpoints
+  submit.sh --init       copy the job scripts into the current directory
+  submit.sh              submit both jobs
+  submit.sh --cpu-only   submit just the CPU job (to retry stage 2)
+
+Run this from your own working directory -- wherever your data is and where you
+want the results. It can be called by its full path from anywhere, and it never
+writes anything into the workflow directory itself.
+
+--check is the exception: run it with your conda environment already active.
+EOF
 }
 
 mode=both
 case "${1:-}" in
+    --check)    mode=check ;;
     --init)     mode=init ;;
     --cpu-only) mode=cpu ;;
     -h|--help)  usage; exit 0 ;;
     "")         ;;
     *)          echo "error: unknown option '$1'" >&2; usage >&2; exit 2 ;;
 esac
+
+if [[ $mode == check ]]; then
+    if ! command -v cellbender >/dev/null 2>&1; then
+        echo "CellBender not found. Activate your conda environment first:" >&2
+        echo "  ml reset && ml miniconda && conda activate cellbender" >&2
+        exit 1
+    fi
+    # Checking the reported version is not enough: a development or editable
+    # install can report a stale version string that predates the fix. Look at
+    # the code that actually runs instead.
+    if python - <<'PY'
+import inspect, sys
+from cellbender.base_cli import get_version
+from cellbender.remove_background import checkpoint
+
+print(f"cellbender {get_version()}")
+print(f"  from {checkpoint.__file__}")
+if "pickle_module=dill" in inspect.getsource(checkpoint.save_checkpoint):
+    print("  checkpointing: OK")
+    sys.exit(0)
+print("  checkpointing: BROKEN")
+print()
+print("  This is CellBender older than 0.4.0. Saving a checkpoint fails with")
+print("  \"cannot pickle 'weakref' object\", and this workflow has nothing to")
+print("  hand from the GPU job to the CPU job without a checkpoint.")
+sys.exit(1)
+PY
+    then
+        exit 0
+    else
+        exit 1
+    fi
+fi
 
 if [[ $mode == init ]]; then
     for script in "$GPU_SCRIPT" "$CPU_SCRIPT"; do
