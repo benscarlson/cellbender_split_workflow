@@ -74,7 +74,15 @@ mkdir -p ~/palmer_scratch/cellbender_demo
 cd ~/palmer_scratch/cellbender_demo
 ```
 
-## 1a. check your CellBender
+Activate the environment
+
+```bash
+ml reset
+ml miniconda
+conda activate cellbender
+```
+
+Check your CellBender version
 
 The whole workflow is built on CellBender's checkpoint file. In releases before
 0.4.0, saving a checkpoint fails outright with `cannot pickle 'weakref' object`,
@@ -82,13 +90,11 @@ so there is nothing for the second job to pick up. Check your environment once,
 before anything else:
 
 ```bash
-ml reset
-ml miniconda
-conda activate cellbender
 
-/path/to/cellbender_split_workflow/submit.sh --check
+~/palmer_scratch/cellbender_split_workflow/submit.sh --check
 ```
 
+It should say `checkpointing: OK`
 ```
 cellbender 0.4.0
   from /path/to/cellbender/remove_background/checkpoint.py
@@ -129,8 +135,8 @@ You should now have:
 ~/palmer_scratch/cellbender_demo/
     tiny_raw_feature_bc_matrix.h5ad
     heart10k_raw_feature_bc_matrix.h5
-    cellbender_gpu.sbatch           <- edit this
-    cellbender_cpu.sbatch           <- edit this
+    cellbender_gpu.sbatch           <- edit this for a real run with your data
+    cellbender_cpu.sbatch           <- edit this for a real run with your data
     results/
 ```
 
@@ -211,7 +217,7 @@ cellbender remove-background \
 ### 5. Submit
 
 ```bash
-./cellbender_split_workflow/submit.sh
+~/palmer_scratch/cellbender_split_workflow/submit.sh
 ```
 
 ```
@@ -246,15 +252,10 @@ The two `cellbender_*_<number>.out` files are the Slurm logs, written in the
 directory you ran `submit.sh` from. You may also find a stray `posterior.h5`
 there — CellBender writes that copy itself, and it is safe to delete.
 
-One thing to be aware of: because the second half now runs on a CPU, the numbers
-come out very slightly different from running everything on a GPU — around 0.1%
-on the counts removed, with the same cells called. This is normal and is
-explained in `technical_doc.md`.
-
 ## If something goes wrong
 
 **Both jobs failed, and the log says `Could not save checkpoint`.** Your
-CellBender is older than 0.4.0. See the top of this page.
+CellBender is older than 0.4.0. See the section for checking your version.
 
 **The GPU job ran out of time.** Nothing is lost — CellBender saves its progress
 every few minutes. Run `submit.sh` again and it carries on from where it got to.
