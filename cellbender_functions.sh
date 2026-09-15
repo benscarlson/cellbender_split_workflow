@@ -1,8 +1,9 @@
 # Helper functions for the two-stage CellBender workflow.
 #
-# Source this near the top of your Slurm scripts:
+# Sourced near the top of the two job scripts. submit.sh sets
+# CELLBENDER_SPLIT_DIR so they can find this file without containing a path:
 #
-#     source "${SLURM_SUBMIT_DIR:-.}/cellbender_functions.sh"
+#     source "${CELLBENDER_SPLIT_DIR:?submit this job with submit.sh}/cellbender_functions.sh"
 #
 # It gives you two commands:
 #
@@ -16,8 +17,10 @@
 
 CELLBENDER_FUNCTIONS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# How often the watcher looks at the log file, in seconds.
-: "${WATCHER_POLL_SECONDS:=15}"
+# How often the watcher looks at the log file, in seconds. Low enough that the
+# handover still happens on the tiny demo dataset, where the CPU-bound part of
+# the run only lasts about twenty seconds.
+: "${WATCHER_POLL_SECONDS:=5}"
 
 
 # Watch CellBender's log in the background, and cancel this Slurm job once

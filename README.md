@@ -6,23 +6,54 @@ This workflow splits the Cellbender analysis in two. The first job performs infe
 
 ## Overview of the workflow
 
-The workflow has batch scripts for the gpu and cpu jobs, plus some bash and slurm functionality to run the workflow. A bash function watches the gpu job and cancels it once inference is complete. Slurm automatically starts the cpu job after the cpu job is complete. Running the workflow can be accomplished in three easy steps.
+This section provides a summay of the workflow. See below for a full example.
 
-1. Open `cellbender_gpu.sbatch`. Set the paths at the top, set your conda
-   environment name, and put your usual CellBender options at the bottom.
+The workflow has batch scripts for the gpu and cpu jobs, plus some bash and slurm functionality to run the workflow. A bash function watches the gpu job and cancels it once inference is complete. Slurm automatically starts the cpu job after the gpu job is complete. Running the workflow can be accomplished in three easy steps.
 
-2. Open `cellbender_cpu.sbatch` and do the same. **`INPUT`, `OUTPUT`, `CKPT` and
-   the CellBender options must match the GPU script.** The second job is
-   continuing the first job's work, so it has to be the same run.
+You work in your own directory — whatever folder holds your data. The workflow
+directory you cloned is never edited or written to.
 
-3. Change the `#SBATCH` lines in either script to suit your data. They are
-   normal Slurm scripts.
-
-4. Submit both:
+1. **Copy the job scripts into your working directory.** From the folder with
+   your data in it:
 
    ```bash
-   ./submit.sh
+   /path/to/cellbender_split_workflow/submit.sh --init
    ```
+
+   That puts `cellbender_gpu.sbatch`, `cellbender_cpu.sbatch` and an empty
+   `results/` folder in the current directory.
+
+2. **Edit the two job scripts.** In each one, set the paths at the top, set your
+   conda environment name, and put your CellBender options on the `cellbender`
+   command at the bottom. **`INPUT`, `OUTPUT`, `CKPT` and the CellBender options
+   must match between the two scripts** — the second job is continuing the first
+   job's work, so it has to be the same run. Change the `#SBATCH` lines to suit
+   your data; they are normal Slurm scripts.
+
+3. **Submit both jobs:**
+
+   ```bash
+   /path/to/cellbender_split_workflow/submit.sh
+   ```
+
+If you will be using this often, add the workflow directory to your `PATH` so
+you can just type `submit.sh`:
+
+```bash
+echo 'export PATH="$PATH:/path/to/cellbender_split_workflow"' >> ~/.bashrc
+```
+
+## The GPU job will say CANCELLED. That is normal.
+
+The GPU job ends itself on purpose, the moment inference is done. `CANCELLED` is
+what a successful first stage looks like here. As long as the CPU job then says
+`COMPLETED`, your run worked.
+
+Check on them with:
+
+```bash
+squeue -u $USER
+```
 
 ## Example: the CellBender quick-start dataset
 
@@ -55,10 +86,11 @@ python /path/to/CellBender/examples/remove_background/generate_tiny_10x_dataset.
 
 It downloads about 170 MB and writes `tiny_raw_feature_bc_matrix.h5ad`.
 
-Now, create a directory for the results:
+### 3. Copy in the job scripts
 
 ```bash
-mkdir results
+cd ~/palmer_scratch/cellbender_demo
+./cellbender_split_workflow/submit.sh --init
 ```
 
 You should now have:
@@ -67,15 +99,18 @@ You should now have:
 ~/palmer_scratch/cellbender_demo/
     tiny_raw_feature_bc_matrix.h5ad
     heart10k_raw_feature_bc_matrix.h5
+    cellbender_gpu.sbatch           <- copied in, yours to edit
+    cellbender_cpu.sbatch           <- copied in, yours to edit
     results/
-    cellbender_split_workflow/      <- the scripts you cloned
+    cellbender_split_workflow/      <- the scripts you cloned, leave alone
 ```
 
-### 3. Edit `cellbender_gpu.sbatch`
+### 4. Check the job scripts
 
-Set the paths, set your conda environment name, and put the tutorial's options
-on the `cellbender` command. The demo is small enough for the short-queue
-partitions, so `gpu_devel` and half an hour are plenty.
+The scripts come set up for exactly this demo, so there is nothing to change
+unless your conda environment is named something other than `cellbender`.
+
+`cellbender_gpu.sbatch`:
 
 ```bash
 #!/bin/bash
@@ -87,18 +122,15 @@ partitions, so `gpu_devel` and half an hour are plenty.
 #SBATCH --time=00:30:00
 #SBATCH --output=cellbender_gpu_%j.out
 
-INPUT=$HOME/palmer_scratch/cellbender_demo/tiny_raw_feature_bc_matrix.h5ad
-OUTPUT=$HOME/palmer_scratch/cellbender_demo/results/tiny.h5
-CKPT=$HOME/palmer_scratch/cellbender_demo/results/tiny_ckpt.tar.gz
+INPUT=tiny_raw_feature_bc_matrix.h5ad
+OUTPUT=results/tiny.h5
+CKPT=results/tiny_ckpt.tar.gz
 
 ml reset
 ml miniconda
 conda activate cellbender
 
-# This demo dataset is so small that the watcher needs to look more often than
-# usual to catch the handover. Leave this out on real data.
-WATCHER_POLL_SECONDS=2
-source "${SLURM_SUBMIT_DIR:-.}/cellbender_functions.sh" || exit 1
+source "${CELLBENDER_SPLIT_DIR:?submit this job with submit.sh}/cellbender_functions.sh" || exit 1
 
 start_watcher "$OUTPUT" "$CKPT"
 
@@ -111,10 +143,8 @@ cellbender remove-background \
     --total-droplets-included 2000
 ```
 
-### 4. Edit `cellbender_cpu.sbatch`
-
-The same paths and the same CellBender options, plus `CKPT_CPU`. No GPU, so no
-`--gres` line and no `--cuda`.
+`cellbender_cpu.sbatch` — the same paths and CellBender options, plus
+`CKPT_CPU`. No GPU, so no `--gres` line and no `--cuda`:
 
 ```bash
 #!/bin/bash
@@ -125,16 +155,16 @@ The same paths and the same CellBender options, plus `CKPT_CPU`. No GPU, so no
 #SBATCH --time=00:30:00
 #SBATCH --output=cellbender_cpu_%j.out
 
-INPUT=$HOME/palmer_scratch/cellbender_demo/tiny_raw_feature_bc_matrix.h5ad
-OUTPUT=$HOME/palmer_scratch/cellbender_demo/results/tiny.h5
-CKPT=$HOME/palmer_scratch/cellbender_demo/results/tiny_ckpt.tar.gz
-CKPT_CPU=$HOME/palmer_scratch/cellbender_demo/results/tiny_ckpt_cpu.tar.gz
+INPUT=tiny_raw_feature_bc_matrix.h5ad
+OUTPUT=results/tiny.h5
+CKPT=results/tiny_ckpt.tar.gz
+CKPT_CPU=results/tiny_ckpt_cpu.tar.gz
 
 ml reset
 ml miniconda
 conda activate cellbender
 
-source "${SLURM_SUBMIT_DIR:-.}/cellbender_functions.sh" || exit 1
+source "${CELLBENDER_SPLIT_DIR:?submit this job with submit.sh}/cellbender_functions.sh" || exit 1
 
 make_checkpoint_cpu_ready "$CKPT" "$CKPT_CPU"
 
@@ -151,8 +181,7 @@ cellbender remove-background \
 ### 5. Submit
 
 ```bash
-cd ~/palmer_scratch/cellbender_demo/cellbender_split_workflow
-./submit.sh
+./cellbender_split_workflow/submit.sh
 ```
 
 ```
@@ -161,7 +190,7 @@ CPU job: 10557827  (waits for 10557826 to end)
 ```
 
 The GPU job runs 150 epochs in under a minute, then cancels itself. The CPU job
-starts as soon as it does and takes another half minute. When both are gone from
+starts as soon as it does and takes another minute. When both are gone from
 `squeue`, the results are in `results/` — and `sacct` will show the GPU job as
 `CANCELLED` and the CPU job as `COMPLETED`, which is correct.
 
@@ -170,21 +199,22 @@ starts as soon as it does and takes another half minute. When both are gone from
 The usual CellBender outputs, in the same folder as `OUTPUT`:
 
 ```
-sample1.h5                 denoised counts
-sample1_filtered.h5        cells only
-sample1_cell_barcodes.csv
-sample1_metrics.csv
-sample1.pdf
-sample1_report.html
-sample1_posterior.h5
-sample1.log                the CPU job's log
-sample1.gpu.log            the GPU job's log, with the training history
-sample1_ckpt.tar.gz        checkpoints -- safe to delete when you are happy
-sample1_ckpt_cpu.tar.gz      with the results
+tiny.h5                 denoised counts
+tiny_filtered.h5        cells only
+tiny_cell_barcodes.csv
+tiny_metrics.csv
+tiny.pdf
+tiny_report.html
+tiny_posterior.h5
+tiny.log                the CPU job's log
+tiny.gpu.log            the GPU job's log, with the training history
+tiny_ckpt.tar.gz        checkpoints -- safe to delete when you are happy
+tiny_ckpt_cpu.tar.gz      with the results
 ```
 
-The two `cellbender_*_<number>.out` files are the Slurm logs, written wherever
-you ran `./submit.sh` from.
+The two `cellbender_*_<number>.out` files are the Slurm logs, written in the
+directory you ran `submit.sh` from. You may also find a stray `posterior.h5`
+there — CellBender writes that copy itself, and it is safe to delete.
 
 One thing to be aware of: because the second half now runs on a CPU, the numbers
 come out very slightly different from running everything on a GPU — around 0.1%
@@ -194,23 +224,22 @@ explained in `technical_doc.md`.
 ## If something goes wrong
 
 **The GPU job ran out of time.** Nothing is lost — CellBender saves its progress
-every few minutes. Run `./submit.sh` again and it carries on from where it got
-to.
+every few minutes. Run `submit.sh` again and it carries on from where it got to.
 
 **The CPU job failed.** The GPU work is safe. Fix whatever went wrong and
 resubmit just that job:
 
 ```bash
-sbatch cellbender_cpu.sbatch
+/path/to/cellbender_split_workflow/submit.sh --cpu-only
 ```
 
 **You want to start again from scratch.** Delete both checkpoint files
 (`..._ckpt.tar.gz` and `..._ckpt_cpu.tar.gz`) first, or CellBender will carry on
 from them instead of starting over.
 
-**You are running several samples.** Give each one its own `OUTPUT`, `CKPT` and
-`CKPT_CPU` paths. The example scripts name the checkpoints after the output file,
-which keeps samples from overwriting each other's work.
+**You are running several samples.** Give each sample its own working directory.
+That keeps its job scripts, checkpoints and results separate from every other
+sample's.
 
 ## More detail
 

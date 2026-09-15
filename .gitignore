@@ -1,0 +1,19 @@
+# Nothing should be edited or written inside this directory -- copy the job
+# scripts into your own working directory with `submit.sh --init` instead.
+# These rules are a safety net in case something does get run in here.
+
+/cellbender_gpu.sbatch
+/cellbender_cpu.sbatch
+/results/
+
+*.out
+*.h5
+*.h5ad
+*.tar.gz
+*.log
+*.csv
+*.pdf
+*.html
+
+__pycache__/
+*.pyc

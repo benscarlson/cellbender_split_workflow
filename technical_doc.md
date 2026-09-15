@@ -10,9 +10,9 @@ that revision.
 
 | file | role |
 |---|---|
-| `cellbender_gpu.sbatch` | stage 1, user-editable |
-| `cellbender_cpu.sbatch` | stage 2, user-editable |
-| `submit.sh` | submits both with a Slurm dependency between them |
+| `templates/cellbender_gpu.sbatch` | stage 1, copied into the user's directory to edit |
+| `templates/cellbender_cpu.sbatch` | stage 2, copied into the user's directory to edit |
+| `submit.sh` | copies the templates out, and submits both jobs with a dependency |
 | `cellbender_functions.sh` | `start_watcher` and `make_checkpoint_cpu_ready` |
 | `cellbender_checkpoint_to_cpu.py` | the checkpoint conversion itself |
 
@@ -20,6 +20,41 @@ The two `.sbatch` files are meant to be edited and are deliberately plain: norma
 `#SBATCH` directives, a few variables, and a `cellbender remove-background`
 command you could copy out and run by hand. Everything with moving parts lives in
 `cellbender_functions.sh`.
+
+## Where things live
+
+The workflow directory is read-only in practice: `submit.sh --init` copies the
+two templates into whatever directory the user is standing in, and everything
+after that — edited job scripts, data, `results/`, checkpoints, Slurm `.out`
+files — stays in that working directory. Nothing is written back into the clone,
+so it stays clean and `git pull` never conflicts.
+
+Three things make that work:
+
+- **`submit.sh` resolves its own location** with
+  `readlink -f "$0"`, so it can be invoked by absolute path from anywhere, or put
+  on `PATH`.
+- **It submits from the current directory**, so Slurm sets each job's working
+  directory to the user's folder. That is why the paths in the job scripts can be
+  relative (`results/tiny.h5`) and need no editing for the common case.
+- **It passes its own location to the jobs** as `CELLBENDER_SPLIT_DIR` via
+  `sbatch --export`, and the job scripts source the helper file from there. This
+  is the reason nothing the user edits contains a path back to the clone.
+
+Because of that last point the job scripts cannot be submitted with a bare
+`sbatch cellbender_cpu.sbatch` — `CELLBENDER_SPLIT_DIR` would be unset and the
+`${VAR:?}` expansion stops the job with a message pointing at `submit.sh`. Use
+`submit.sh --cpu-only` to resubmit stage 2 on its own.
+
+### Why this is not a conda package
+
+Installing the workflow into the CellBender conda environment was considered and
+rejected. `submit.sh` does not need CellBender — it only calls `sbatch` — so
+putting it in the environment's `bin/` would force a `ml miniconda; conda
+activate` before a user could submit anything. The workflow is also independent
+of CellBender's version, and a user with several CellBender environments would
+have to install it into each one. Resolving the path at submission time costs
+nothing and avoids all of that.
 
 ## How the two jobs are chained
 
@@ -36,7 +71,7 @@ checkpoint while the GPU job is still being torn down.
 ## `start_watcher <output.h5> <ckpt.tar.gz>`
 
 Backgrounds a subshell that polls CellBender's log every `WATCHER_POLL_SECONDS`
-(default 15) and cancels the job when inference is finished. It waits for two
+(default 5) and cancels the job when inference is finished. It waits for two
 conditions together:
 
 - the log contains `cellbender:remove-background: Inference procedure complete.`
@@ -218,6 +253,7 @@ the pickled dataloaders carry the trimmed count matrix.
 - Between the watcher firing and Slurm killing the job, CellBender keeps working
   on the posterior for a few seconds. That work is discarded and stage 2 redoes
   it.
-- `source "${SLURM_SUBMIT_DIR:-.}/cellbender_functions.sh"` assumes the sbatch
-  scripts are submitted from the directory holding the helper files, which is
-  what `submit.sh` does. If they are moved apart, put the full path there.
+- `submit.sh` must stay in the same directory as `cellbender_functions.sh` and
+  `templates/`, since it locates them relative to itself. Symlinking `submit.sh`
+  onto a `PATH` directory is fine — `readlink -f` follows the symlink to the real
+  file — but copying it out on its own is not.
