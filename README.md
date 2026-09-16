@@ -123,7 +123,8 @@ It downloads about 170 MB and writes `tiny_raw_feature_bc_matrix.h5ad`.
 
 ### 3. Initialize the workflow
 
-This copies in the job script templates, submit script, and creates a folder for results.
+This copies in the job script templates and creates a folder for results. You
+keep running `submit.sh` from the cloned workflow directory.
 
 ```bash
 ~/palmer_scratch/cellbender_split_workflow/submit.sh --init
