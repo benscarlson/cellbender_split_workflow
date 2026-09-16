@@ -1,18 +1,18 @@
 # Running CellBender in two stages
 
-[CellBender](https://github.com/broadinstitute/CellBender) starts by doing inference, which is best run using a GPU. Everything after that uses only the CPU, and often takes longer than the inference stage. Thus running the entire analysis on a GPU node wastes a lot of GPU cycles and risks being terminated due to inefficient use.
+[CellBender](https://github.com/broadinstitute/CellBender) starts by doing inference, which is best run using a GPU. Everything after that uses only the CPU, and often takes longer than the inference stage. Thus running the entire analysis on a GPU node wastes GPU cycles and risks being terminated due to inefficient use.
 
 This workflow splits the Cellbender analysis in two. The first job performs inference on a GPU and stops as soon as that part is finished. The second job picks up where it left off and finishes on an ordinary CPU node.
 
 ## Overview of the workflow
 
-This section provides a summay of the workflow. See below for a full example. Also see the section to first verify the cellbender version.
+This section provides a summay of the workflow. Note you need to use version >= 0.4.0. See below for a full example and for instructions on how to check your version.
 
 The workflow has batch scripts for the gpu and cpu jobs, plus some bash and slurm functionality to run the workflow. A bash function watches the gpu job and cancels it once inference is complete. Slurm automatically starts the cpu job after the gpu job is complete. Running the workflow can be accomplished in three easy steps.
 
 You work in your own directory — whatever folder holds your data.
 
-1. **Copy the job scripts into your working directory.** From the folder with
+1. **Copy the job scripts into your working directory.** The example below shows how to download the workflow code. From the folder with
    your data in it:
 
    ```bash
@@ -231,7 +231,7 @@ starts as soon as it does and takes another minute. When both are gone from
 `squeue`, the results are in `results/` — and `sacct` will show the GPU job as
 `CANCELLED` and the CPU job as `COMPLETED`, which is correct.
 
-## What you get
+## Expected output 
 
 The usual CellBender outputs, in the same folder as `OUTPUT`:
 
